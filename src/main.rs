@@ -23,7 +23,6 @@ mod api;
 async fn main() -> Result<(), anyhow::Error> {
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("INFO"));
     log::info!("Starting ZincObserve Test");
-
     // HTTP server
     let thread_id = Arc::new(AtomicU8::new(0));
     let haddr: SocketAddr = format!("0.0.0.0:{}", "5080").parse()?;
