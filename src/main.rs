@@ -14,26 +14,18 @@
 
 use actix_web::{middleware, web, App, HttpServer};
 use std::net::SocketAddr;
-use std::sync::atomic::{AtomicU8, Ordering};
-use std::sync::Arc;
 
 mod api;
 
-#[tokio::main]
+#[actix_web::main]
 async fn main() -> Result<(), anyhow::Error> {
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("INFO"));
     log::info!("Starting ZincObserve Test");
     // HTTP server
-    let thread_id = Arc::new(AtomicU8::new(0));
     let haddr: SocketAddr = format!("0.0.0.0:{}", "5080").parse()?;
 
     HttpServer::new(move || {
-        let local_id = thread_id.load(Ordering::SeqCst) as usize;
-        log::info!(
-            "starting HTTP server at: {}, thread_id: {}",
-            haddr,
-            local_id
-        );
+        log::info!("starting HTTP server at: {haddr}");
 
         let app = App::new().service(
             web::scope("/api")
