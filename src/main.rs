@@ -14,40 +14,32 @@
 
 use actix_web::{middleware, web, App, HttpServer};
 use std::net::SocketAddr;
-use std::sync::atomic::{AtomicU8, Ordering};
-use std::sync::Arc;
 
 mod api;
 
-#[tokio::main]
+#[actix_web::main]
 async fn main() -> Result<(), anyhow::Error> {
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("INFO"));
     log::info!("Starting ZincObserve Test");
+
     // HTTP server
-    let thread_id = Arc::new(AtomicU8::new(0));
     let haddr: SocketAddr = format!("0.0.0.0:{}", "5080").parse()?;
+    log::info!("starting HTTP server at: {}", haddr,);
 
-    HttpServer::new(move || {
-        let local_id = thread_id.load(Ordering::SeqCst) as usize;
-        log::info!(
-            "starting HTTP server at: {}, thread_id: {}",
-            haddr,
-            local_id
-        );
-
-        let app = App::new().service(
-            web::scope("/api")
-                .service(api::org_es_index)
-                .service(api::org_es_license)
-                .service(api::org_es_xpack)
-                .service(api::org_es_index_template)
-                .service(api::org_es_index_template_create)
-                .service(api::org_es_data_stream)
-                .service(api::org_es_data_stream_create),
-        );
-        app.wrap(middleware::Compress::default())
+    HttpServer::new(|| {
+        App::new()
+            .service(
+                web::scope("/api")
+                    .service(api::org_es_index)
+                    .service(api::org_es_license)
+                    .service(api::org_es_xpack)
+                    .service(api::org_es_index_template)
+                    .service(api::org_es_index_template_create)
+                    .service(api::org_es_data_stream)
+                    .service(api::org_es_data_stream_create),
+            )
             .wrap(middleware::Logger::new(
-                r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
+                r#"%a "%r" %s %b "%{Content-Length}i" %T"#,
             ))
     })
     .bind(haddr)?
