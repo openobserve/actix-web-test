@@ -1,52 +1,52 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-use actix_web::{middleware, web, App, HttpServer};
+use axum::routing::{get, put};
+use axum::Router;
 use std::net::SocketAddr;
+use tower_http::trace::{self, TraceLayer};
+use tracing::Level;
 
 mod api;
 
-#[actix_web::main]
-async fn main() -> Result<(), anyhow::Error> {
-    env_logger::init_from_env(env_logger::Env::new().default_filter_or("INFO"));
-    log::info!("Starting ZincObserve Test");
-    // HTTP server
-    let haddr: SocketAddr = format!("0.0.0.0:{}", "5080").parse()?;
+#[tokio::main]
+async fn main() {
+    tracing_subscriber::fmt()
+        .with_target(false)
+        .compact()
+        .init();
 
-    HttpServer::new(move || {
-        log::info!("starting HTTP server at: {haddr}");
-
-        let app = App::new().service(
-            web::scope("/api")
-                .service(api::org_es_index)
-                .service(api::org_es_license)
-                .service(api::org_es_xpack)
-                .service(api::org_es_index_template)
-                .service(api::org_es_index_template_create)
-                .service(api::org_es_data_stream)
-                .service(api::org_es_data_stream_create),
+    // build our application with a route
+    let app = Router::new()
+        .route(
+            "/api/:org_id/",
+            get(api::org_es_index).head(api::org_es_index),
+        )
+        .route("/api/:org_id/_license", get(api::org_es_license))
+        .route("/api/:org_id/_xpack", get(api::org_es_xpack))
+        .route(
+            "/api/:org_id/_index_template/:name",
+            get(api::org_es_index_template).head(api::org_es_index_template),
+        )
+        .route(
+            "/api/:org_id/_index_template/:name",
+            put(api::org_es_index_template_create),
+        )
+        .route(
+            "/api/:org_id/_data_stream/:name",
+            get(api::org_es_data_stream).head(api::org_es_data_stream),
+        )
+        .route(
+            "/api/:org_id/_data_stream/:name",
+            put(api::org_es_data_stream_create),
+        )
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
+                .on_response(trace::DefaultOnResponse::new().level(Level::INFO)),
         );
-        app.wrap(middleware::Compress::default())
-            .wrap(middleware::Logger::new(
-                r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
-            ))
-    })
-    .bind(haddr)?
-    .run()
-    .await?;
 
-    log::info!("server stopped");
-
-    Ok(())
+    // run our app with hyper
+    let addr = SocketAddr::from(([0, 0, 0, 0], 5080));
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
 }
