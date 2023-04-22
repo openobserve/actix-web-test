@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use actix_web::{dev::Extensions, rt::net::TcpStream};
 use actix_web::{middleware, web, App, HttpServer};
+use std::any::Any;
 use std::net::SocketAddr;
 
 mod api;
@@ -42,6 +44,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 r#"%a "%r" %s %b "%{Content-Length}i" %T"#,
             ))
     })
+    .on_connect(get_conn_info)
     .bind(haddr)?
     .run()
     .await?;
@@ -49,4 +52,25 @@ async fn main() -> Result<(), anyhow::Error> {
     log::info!("server stopped");
 
     Ok(())
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+struct ConnectionInfo {
+    bind: SocketAddr,
+    peer: SocketAddr,
+    ttl: Option<u32>,
+}
+
+fn get_conn_info(connection: &dyn Any, _data: &mut Extensions) {
+    if let Some(sock) = connection.downcast_ref::<TcpStream>() {
+        let conn = ConnectionInfo {
+            bind: sock.local_addr().unwrap(),
+            peer: sock.peer_addr().unwrap(),
+            ttl: sock.ttl().ok(),
+        };
+        println!("new connection: {:?}", conn);
+    } else {
+        unreachable!("connection should only be plaintext since no TLS is set up");
+    }
 }
