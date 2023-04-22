@@ -40,8 +40,9 @@ async fn main() -> Result<(), anyhow::Error> {
                     .service(api::org_es_data_stream)
                     .service(api::org_es_data_stream_create),
             )
+            .app_data(web::PayloadConfig::default().limit(3712140))
             .wrap(middleware::Logger::new(
-                r#"%a "%r" %s %b "%{Content-Length}i" %T"#,
+                r#"%a "%r" %s %b "%{Content-Length}i" "%{User-Agent}i" %T"#,
             ))
     })
     .on_connect(get_conn_info)
